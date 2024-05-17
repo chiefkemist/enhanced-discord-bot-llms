@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
 
 import os
+import random
+
 import discord
 
 from asyncio import sleep
 
 from discord.ext import commands, tasks
 
+from enhanced_discord_bot_llms.constants import (
+    WORDS_THE_BOT_DONT_LIKE,
+    FROWNING_FACE_EMOJI,
+)
 from enhanced_discord_bot_llms.llm_svc import (
     gen_client,
     usine_de_gaou_creation,
     gen_async_client,
     streaming_usine_de_gaou_creation,
-    LLMModel, streaming_gaou_formula,
+    LLMModel,
+    streaming_gaou_formula,
 )
 
 intents = discord.Intents.default()
@@ -26,27 +33,26 @@ bot = commands.Bot(command_prefix="?", intents=intents)
 
 
 @bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user} (ID: {bot.user.id})")
-    my_background_tasks.start()
-
-
-BAD_WORDS = ["slur1", "slur2", "swear1"]
-
-
-@bot.event
 async def on_message(message):
     # we do not want the bot to reply to itself
     if message.author == bot.user:
         return
 
-    content = message.content.lower()
-    for word in BAD_WORDS:
-        if word in content:
-            await message.delete()
-            await message.channel.send(
-                f"{message.author.mention} Please do not use that word."
-            )
+    try:
+        content = message.content.lower()
+        for word in WORDS_THE_BOT_DONT_LIKE:
+            if word in content:
+                await sleep(10)
+                await message.channel.send(
+                    f"{message.author.mention} Hey! Do not use that word again {FROWNING_FACE_EMOJI}"
+                )
+                await message.channel.send(
+                    f"{message.author.mention} You called me: {word} and I don't like it. I've deleted your message."
+                )
+                await sleep(10)
+                await message.delete()
+    except Exception as e:
+        print(f"Error: {e}")
 
     if message.content == "pingGG":
         await message.channel.send("pongGG")
@@ -143,31 +149,51 @@ async def delete_messages(ctx: commands.Context, limit: int):
             continue
 
 
-@tasks.loop(minutes=5)
-async def my_background_tasks():
-    await bot.change_presence(activity=discord.Game(name="with Gaous"))
+@tasks.loop(minutes=16)
+async def my_background_gaou_tasks():
+    await bot.change_presence(activity=discord.Game(name="With Gaous"))
     # members = [[member for member in guild.members] for guild in bot.guilds]
     # members = bot.get_all_members()
     channels = bot.get_all_channels()
     for chnl in channels:
         if isinstance(chnl, discord.TextChannel) and chnl.name == "botexperiments":
-            # chnl_members = chnl.guild.members
+            await chnl.send(
+                f"Who's Gaou anyway? Me Gaou? Think again... {chnl.mention}"
+            )
             chnl_members = chnl.members
             for chnl_m in chnl_members:
                 if chnl_m.bot:
                     continue
-                elif "african" in chnl_m.name.lower() or "dog" in chnl_m.name.lower():
-                    await chnl.send(f"Who's Gaou? Me Gaou? {chnl.mention}")
-                    model = LLMModel.GPT4_Omni
+                elif (
+                    "african" in chnl_m.name.lower()
+                    or "dog" in chnl_m.name.lower()
+                    or "lle" in chnl_m.name.lower()
+                    or "bru" in chnl_m.name.lower()
+                ):
+                    await sleep(8)
+                    # model = random.choice(
+                    #     [model.value for model in LLMModel]
+                    # )  # Choose a model at random
+                    model = LLMModel.Claude3
                     client = gen_async_client(model=model)
-                    gueou_joke = await streaming_gaou_formula(client, chnl_m.display_name, model=model)
-                    await chnl.send(f"{gueou_joke.friend_gaou_joke} ({gueou_joke.language.name}) {chnl_m.mention}")
+                    gueou_joke = await streaming_gaou_formula(
+                        client, chnl_m.display_name, model=model
+                    )
+                    # message_to_gueou = f"{gueou_joke.friend_gaou_joke} ({gueou_joke.language.name} => {gueou_joke.language.value}) {chnl_m.mention}"
+                    message_to_gueou = f"{gueou_joke.friend_gaou_joke} ({gueou_joke.language.value}) {chnl_m.mention}"
+                    await chnl.send(message_to_gueou)
 
 
-@my_background_tasks.before_loop
-async def before():
+@my_background_gaou_tasks.before_loop
+async def before_gueou():
     await bot.wait_until_ready()
-    print("Finished waiting")
+    print("Ready for Gaous!")
+
+
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user} (ID: {bot.user.id})")
+    my_background_gaou_tasks.start()
 
 
 if __name__ == "__main__":
