@@ -2,12 +2,18 @@
 
 from litestar import Litestar, get, post
 from litestar.openapi import OpenAPIConfig
-from litestar.openapi.plugins import ScalarRenderPlugin, RapidocRenderPlugin, RedocRenderPlugin, SwaggerRenderPlugin
+from litestar.openapi.plugins import (
+    ScalarRenderPlugin,
+    RapidocRenderPlugin,
+    RedocRenderPlugin,
+    SwaggerRenderPlugin,
+)
 
 from enhanced_discord_bot_llms.llm_svc import (
     LLMModel,
     gen_async_client,
-    UserInfo, streaming_usine_de_gaou_creation,
+    UserInfo,
+    streaming_usine_de_gaou_creation,
 )
 
 
@@ -18,7 +24,7 @@ def read_root() -> dict:
 
 @post("/gaou/{parametre:str}")
 async def creer_gaou(parametre: str) -> UserInfo:
-    model = LLMModel.GPT4_Omni
+    model = LLMModel.LLAMA3
     client = gen_async_client(model=model)
     gaou = await streaming_usine_de_gaou_creation(client, parametre, model=model)
     print(f"Nouveau gaou créé: {gaou},\n selon le paramètre {parametre}\n\n")
@@ -33,11 +39,11 @@ app = Litestar(
         version="0.1.0",
         path="/docs",
         render_plugins=[
-            RapidocRenderPlugin(path="/rapidoc"),
-            RedocRenderPlugin(path="/redoc"),
-            ScalarRenderPlugin(path="/scalar"),
-            SwaggerRenderPlugin(path="/swagger"),
-        ]
+            RapidocRenderPlugin(),
+            # RedocRenderPlugin(),
+            # ScalarRenderPlugin(),
+            # SwaggerRenderPlugin(),
+        ],
     ),
     debug=True,
 )

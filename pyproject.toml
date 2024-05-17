@@ -28,6 +28,7 @@ dev-dependencies = [
     "mypy>=1.10.0",
     "pytest>=8.2.0",
     "jupyterlab>=4.2.0",
+    "httpie>=3.2.2",
 ]
 
 [tool.rye.scripts]

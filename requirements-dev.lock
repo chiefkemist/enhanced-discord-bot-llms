@@ -54,6 +54,7 @@ cffi==1.16.0
     # via argon2-cffi-bindings
     # via cryptography
 charset-normalizer==3.3.2
+    # via httpie
     # via requests
 click==8.1.7
     # via granian
@@ -70,6 +71,7 @@ debugpy==1.8.1
 decorator==5.1.1
     # via ipython
 defusedxml==0.7.1
+    # via httpie
     # via nbconvert
 discord-py==2.3.2
     # via enhanced-discord-bot-llms
@@ -102,6 +104,7 @@ h11==0.14.0
     # via uvicorn
 httpcore==1.0.5
     # via httpx
+httpie==3.2.2
 httptools==0.6.1
     # via uvicorn
 httpx==0.27.0
@@ -194,6 +197,7 @@ msgspec==0.18.6
     # via litestar
 multidict==6.0.5
     # via aiohttp
+    # via httpie
     # via litestar
     # via yarl
 mypy==1.10.0
@@ -229,6 +233,8 @@ parso==0.8.4
     # via jedi
 pexpect==4.9.0
     # via ipython
+pip==24.0
+    # via httpie
 platformdirs==4.2.2
     # via jupyter-core
 pluggy==1.5.0
@@ -256,9 +262,12 @@ pydantic-core==2.18.2
     # via instructor
     # via pydantic
 pygments==2.18.0
+    # via httpie
     # via ipython
     # via nbconvert
     # via rich
+pysocks==1.7.1
+    # via requests
 pytest==8.2.0
 python-dateutil==2.9.0.post0
     # via arrow
@@ -281,7 +290,11 @@ referencing==0.35.1
     # via jsonschema-specifications
     # via jupyter-events
 requests==2.31.0
+    # via httpie
     # via jupyterlab-server
+    # via requests-toolbelt
+requests-toolbelt==1.0.0
+    # via httpie
 rfc3339-validator==0.1.4
     # via jsonschema
     # via jupyter-events
@@ -289,6 +302,7 @@ rfc3986-validator==0.1.1
     # via jsonschema
     # via jupyter-events
 rich==13.7.1
+    # via httpie
     # via instructor
     # via litestar
     # via rich-click
@@ -303,6 +317,8 @@ send2trash==1.8.3
     # via jupyter-server
 setproctitle==1.3.3
     # via granian
+setuptools==69.5.1
+    # via httpie
 shellingham==1.5.4
     # via typer
 six==1.16.0

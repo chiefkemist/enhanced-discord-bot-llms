@@ -5,14 +5,14 @@ import discord
 
 from asyncio import sleep
 
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from enhanced_discord_bot_llms.llm_svc import (
     gen_client,
     usine_de_gaou_creation,
     gen_async_client,
     streaming_usine_de_gaou_creation,
-    LLMModel,
+    LLMModel, streaming_gaou_formula,
 )
 
 intents = discord.Intents.default()
@@ -20,6 +20,7 @@ intents.typing = False
 intents.messages = True
 intents.message_content = True
 intents.reactions = True
+intents.members = True
 
 bot = commands.Bot(command_prefix="?", intents=intents)
 
@@ -27,6 +28,7 @@ bot = commands.Bot(command_prefix="?", intents=intents)
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user} (ID: {bot.user.id})")
+    my_background_tasks.start()
 
 
 BAD_WORDS = ["slur1", "slur2", "swear1"]
@@ -71,7 +73,7 @@ async def ping(ctx: commands.Context):
     """
     ctx: Context (discord.ext.commands.Context, information about the command)
 
-    !ping
+    ?ping
     """
     await ctx.reply("pong")
 
@@ -83,7 +85,7 @@ async def new_gaou(ctx: commands.Context, parametre: str):
     ctx: Context (discord.ext.commands.Context, information about the command)
     parametre: str (message to send to the model)
 
-    !new_gaou "I am not a Gaou named Lambert who is 15 years old and is intelligent."
+    ?new_gaou "I am not a Gaou named Lambert who is 15 years old and is intelligent."
     """
     model = LLMModel.GPT4_Omni
     # model = LLMModel.LLAMA3
@@ -111,7 +113,7 @@ async def cleanup(ctx: commands.Context, limit: int):
     ctx: Context (discord.ext.commands.Context, information about the command)
     limit: int (number of messages to delete)
 
-    !cleanup 10
+    ?cleanup 10
     """
     await delete_messages(ctx, limit)
 
@@ -123,7 +125,7 @@ async def dm_cleanup(ctx: commands.Context, limit: int):
     ctx: Context (discord.ext.commands.Context, information about the command)
     limit: int (number of messages to delete)
 
-    !dm_cleanup 10
+    ?dm_cleanup 10
     """
     await delete_messages(ctx, limit)
 
@@ -139,6 +141,33 @@ async def delete_messages(ctx: commands.Context, limit: int):
             print(f"Error: {e}")
             await ctx.reply(f"You may not have permission to delete messages.")
             continue
+
+
+@tasks.loop(minutes=5)
+async def my_background_tasks():
+    await bot.change_presence(activity=discord.Game(name="with Gaous"))
+    # members = [[member for member in guild.members] for guild in bot.guilds]
+    # members = bot.get_all_members()
+    channels = bot.get_all_channels()
+    for chnl in channels:
+        if isinstance(chnl, discord.TextChannel) and chnl.name == "botexperiments":
+            # chnl_members = chnl.guild.members
+            chnl_members = chnl.members
+            for chnl_m in chnl_members:
+                if chnl_m.bot:
+                    continue
+                elif "african" in chnl_m.name.lower() or "dog" in chnl_m.name.lower():
+                    await chnl.send(f"Who's Gaou? Me Gaou? {chnl.mention}")
+                    model = LLMModel.GPT4_Omni
+                    client = gen_async_client(model=model)
+                    gueou_joke = await streaming_gaou_formula(client, chnl_m.display_name, model=model)
+                    await chnl.send(f"{gueou_joke.friend_gaou_joke} ({gueou_joke.language.name}) {chnl_m.mention}")
+
+
+@my_background_tasks.before_loop
+async def before():
+    await bot.wait_until_ready()
+    print("Finished waiting")
 
 
 if __name__ == "__main__":
