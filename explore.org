@@ -1,0 +1,70 @@
+#+title: Explore Python Libraries
+
+* Exploration de certaines libraries Python
+
+Note:
+
+- C'est possible d'executer du code Python directement dans un fichier /org-mode/ en utilisant Emacs.
+- Pour pouvoir utiliser les libraries Python pendant l'execution du code dans le block /#+begin_src/ de org-mode, il fault ajouter l'attribut /:session/.
+
+#+begin_src python :results output
+
+print(f"1 + 1 = {1 + 1}")
+
+#+end_src
+
+#+RESULTS:
+: 1 + 1 = 2
+
+#+begin_src python :session  :results output
+
+import instructor
+from pydantic import BaseModel
+from openai import OpenAI
+
+
+class UserInfo(BaseModel):
+    name: str
+    age: int
+    est_adolescent: bool
+    est_intelligent: bool
+
+
+client = instructor.from_openai(OpenAI())
+
+def usine_de_gaou_creation(parametre: str) -> UserInfo:
+    gaou = client.chat.completions.create(
+        model = "gpt-4-turbo",
+        response_model = UserInfo,
+        messages = [
+            {
+                "role": "user",
+                "content": parametre}
+        ]
+    )
+    return gaou
+
+premier_gaou = usine_de_gaou_creation(
+    "Le Gaou a 18ans et naif mais a du potentiel."
+)
+deuxieme_gaou = usine_de_gaou_creation(
+    "Le Gaspard a 24ans n'aime pas apprendre."
+)
+troisieme_gaou = usine_de_gaou_creation(
+    "Le Gnata a 36ans et n'a toujours rien compris a la vie."
+)
+
+print(f"1er Gaou: {premier_gaou}\n")
+print(f"2eme Gaou: {deuxieme_gaou}\n")
+print(f"3eme Gaou: {troisieme_gaou}\n")
+
+#+end_src
+
+#+RESULTS:
+: __PYTHON_EL_eval("try:\n    with open('/var/folders/yl/ptkxdx8x57991msl1g5tnfp80000gn/T/babel-nWbIAF/python-L5lpb3') as f:\n        exec(compile(f.read(), f.name, 'exec'))\nexcept:\n    raise\nfinally:\n    print('
+
+Ok, petite explication:
+
+- Le code au dessus utilise le model `UserInfo` pour structurer la reponse qui provient de OpenAI
+- Le model `UserInfo` contient les attributs d'un Gaou
+- L'usine de Gaou aide a creer chaque Gaoou a partir de sa description specifique
