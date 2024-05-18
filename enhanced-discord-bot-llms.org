@@ -1,0 +1,145 @@
+#+title: Enhanced Discord Bot Llms
+#+author: ChiefKemist
+
+
+* Features
+
+- Executes user commands
+- Filters out spam
+- Executes background tasks
+
+
+* Deployment
+
+** Docker Containers
+
+*** Dockerize Discord API
+
+#+begin_src Dockerfile
+
+FROM python:3.12.3-alpine3.19
+
+COPY . .
+
+RUN apk add --no-cache libffi-dev openssl-dev gcc musl-dev make
+
+RUN pip install -r requirements.lock
+
+WORKDIR /src/enhanced_discord_bot_llms
+
+CMD ["python", "gaouapp.py"]
+
+
+#+end_src
+
+*** Dockerize Discord Bot
+
+FROM python:3.12.3-alpine3.19
+
+COPY . .
+
+RUN apk add --no-cache libffi-dev openssl-dev gcc musl-dev make
+
+RUN pip install -r requirements.lock
+
+WORKDIR /src/enhanced_discord_bot_llms
+
+CMD ["python", "gaoubot.py"]
+
+
+*** Helper Script
+
+
+#+begin_src bash
+
+
+
+#+end_src
+
+** Infrastructure
+
+#+begin_src mermaid
+
+graph TB
+
+DockerEngine(Docker Engine)
+
+DockerEngine -- Runs --> DockerContainer
+DockerEngine -- Builds --> DockerImage
+
+DockerFile(Dockerfile: Recipe for Images) -- Defines --> DockerImage
+
+DockerHub(Docker Hub: Public Repository) -- Stores and Shares --> DockerImage
+
+DockerContainer(Docker Container: Tiny, stand-alone, executable package)
+DockerImage(Docker Image: Blueprints for Containers) -- Creates --> DockerContainer
+
+subgraph "Analogy: Construction"
+  DockerFile -- "Architect's Plan" --> DockerImage
+  DockerImage -- "Pre-fab house parts" --> DockerContainer
+end
+
+#+end_src
+
+**** Install Docker on Ubuntu
+
+#+begin_src bash
+
+# Update your existing list of packages
+sudo apt update
+
+# Install a few prerequisite packages which let `apt` use packages over HTTPS
+sudo apt install apt-transport-https ca-certificates curl software-properties-common
+
+# Add the GPG key for the official Docker repository to your system
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+# Add the Docker repository to APT sources
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Update your existing list of packages again for the addition to be recognized
+sudo apt update
+
+# Make sure you are about to install from the Docker repo instead of the default Ubuntu repo
+apt-cache policy docker-ce
+
+# Install Docker
+sudo apt install docker-ce
+
+# Check that it’s running
+sudo systemctl status docker
+
+#+end_src
+
+**** Configure Docker
+
+Docker without `sudo`
+
+#+begin_src bash
+
+# Add your username to the docker group
+sudo usermod -aG docker ${USER}
+
+#+end_src
+
+Apply the new group membership, log out of the server and back in (Optional?)
+
+#+begin_src bash
+
+su - ${USER}
+
+groups
+
+#+end_src
+
+**** Environment Variables Management
+
+We will use [[https://direnv.net/][direnv]] and [[https://direnv.net/docs/hook.html][configure]] it for bash inside our virtual machine.
+
+#+begin_src bash
+
+sudo apt install direnv
+
+eval "$(direnv hook bash)"
+
+#+end_src

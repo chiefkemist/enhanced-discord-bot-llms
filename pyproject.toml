@@ -26,9 +26,9 @@ dev-dependencies = [
     "ruff>=0.4.4",
     "isort>=5.13.2",
     "mypy>=1.10.0",
-    "pytest>=8.2.0",
     "jupyterlab>=4.2.0",
     "httpie>=3.2.2",
+    "pytest>=8.2.0",
 ]
 
 [tool.rye.scripts]
