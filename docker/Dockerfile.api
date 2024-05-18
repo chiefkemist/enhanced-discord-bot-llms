@@ -1,0 +1,12 @@
+FROM python:3.12.3-alpine3.19
+
+COPY . .
+
+RUN apk add --no-cache libffi-dev openssl-dev gcc musl-dev make
+
+RUN pip install -r requirements.lock
+
+WORKDIR /src/enhanced_discord_bot_llms
+
+CMD ["python", "gaouapp.py"]
+
