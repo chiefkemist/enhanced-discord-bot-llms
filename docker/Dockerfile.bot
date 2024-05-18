@@ -9,4 +9,3 @@ RUN pip install -r requirements.lock
 WORKDIR /src/enhanced_discord_bot_llms
 
 CMD ["python", "gaoubot.py"]
-

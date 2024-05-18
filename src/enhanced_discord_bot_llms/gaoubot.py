@@ -100,7 +100,7 @@ async def new_gaou(ctx: commands.Context, parametre: str):
         gueou = await streaming_usine_de_gaou_creation(client, parametre, model=model)
         await ctx.reply(f"""
 ```json
-    
+
 {gueou.model_dump_json(
     indent=4
 )}

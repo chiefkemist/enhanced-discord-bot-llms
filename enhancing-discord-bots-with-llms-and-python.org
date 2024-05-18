@@ -1,0 +1,649 @@
+#+title: Enhancing Discord Bots with LLMs and Python
+#+author: ChiefKemist
+#+date: <2024-05-18 Sat>
+
+
+* Features
+
+- Executes user commands
+- Filters out spam
+- Executes background tasks
+
+
+* Libraries
+
+
+#+begin_src mermaid
+
+flowchart TD
+    A[Application] -->|Sends input| B[Function Caller]
+    B -->|Queries| C[LLM]
+    C -->|Returns raw output| D[Response Handler]
+    D -->|Structures data using| E[Pydantic Models]
+    E --> F{Structured Output}
+    F -->|Used by| A
+
+    subgraph large_language_models [Large Language Models]
+    C
+    end
+
+    subgraph response_handling [Response Handling]
+    D
+    E
+    end
+
+#+end_src
+
+- Application: This is your main system or service that needs to interact with the LLM.
+- Function Caller: Acts as an intermediary that sends input to the LLM and receives the raw output. This component encapsulates the logic needed to communicate with the LLM.
+- LLM (Large Language Model): The AI model that processes the input and generates output based on the function call. Examples include GPT-4, Claude3, etc.
+- Response Handler: Takes the raw output from the LLM and begins the process of structuring it. This may involve error checking, filtering, and preparing data for conversion into a structured format.
+- Pydantic Models: These are used to define the structure of the output data explicitly. Pydantic models enforce type checking and data validation, which helps in ensuring that the data conforms to a specified schema.
+- Structured Output: The final output that is well-structured and ready to be used by the application. This output is predictable and easier to integrate into downstream processes or systems.
+
+#+begin_src mermaid
+
+flowchart TD
+    A[Client Application] -->|Uses| B[Instructor Library]
+    B --> |Wraps| C[GPT-4]
+    B --> |Wraps| D[LLAMA3]
+    B --> |Wraps| E[Claude3]
+
+    C --> G((Pydantic Models))
+    D --> G
+    E --> G
+
+    G --> H{Structured Outputs}
+    H -->|Returned to| A
+
+    subgraph large_language_models [Large Language Models]
+    C
+    D
+    E
+    end
+
+    subgraph pydantic_modelling [Output Structuring]
+    G
+    end
+
+#+end_src
+
+- Client Application: This is your Python application that needs to interact with large language models. It uses the Instructor library to facilitate these interactions.
+- Instructor Library: Acts as a middleware that wraps around large language models. It is responsible for sending requests to these models and processing their outputs.
+- Large Language Models: Includes GPT-4, LLAMA3, and Claude3. Each of these models can generate complex text outputs based on the input they receive.
+- Pydantic Models: These are used within the Instructor library to structure the raw output from the language models into a more manageable and defined format, making application development cleaner and more predictable.
+- Structured Outputs: The final structured outputs are then returned to the client application, where they can be further utilized or displayed.
+
+* Implementation
+
+** API Implementation
+
+
+#+begin_src python :tangle src/enhanced_discord_bot_llms/gaouapp.py :mkdirp yes :cache no
+
+#!/usr/bin/env python3
+
+from litestar import Litestar, get, post
+from litestar.openapi import OpenAPIConfig
+from litestar.openapi.plugins import (
+    ScalarRenderPlugin,
+    RapidocRenderPlugin,
+    RedocRenderPlugin,
+    SwaggerRenderPlugin,
+)
+
+from enhanced_discord_bot_llms.llm_svc import (
+    LLMModel,
+    gen_async_client,
+    UserInfo,
+    streaming_usine_de_gaou_creation,
+)
+
+
+@get("/", sync_to_thread=False)
+def read_root() -> dict:
+    return {"Hello": "World"}
+
+
+@post("/gaou/{parametre:str}")
+async def creer_gaou(parametre: str) -> UserInfo:
+    model = LLMModel.LLAMA3
+    client = gen_async_client(model=model)
+    gaou = await streaming_usine_de_gaou_creation(client, parametre, model=model)
+    print(f"Nouveau gaou créé: {gaou},\n selon le paramètre {parametre}\n\n")
+    return gaou
+
+
+app = Litestar(
+    route_handlers=[read_root, creer_gaou],
+    openapi_config=OpenAPIConfig(
+        title="Gaou API",
+        description="API pour créer des Gaous",
+        version="0.1.0",
+        path="/docs",
+        render_plugins=[
+            RapidocRenderPlugin(),
+            # RedocRenderPlugin(),
+            # ScalarRenderPlugin(),
+            # SwaggerRenderPlugin(),
+        ],
+    ),
+    debug=True,
+)
+
+if __name__ == "__main__":
+    import uvicorn
+
+    application = "gaouapp:app"
+    uvicorn.run(application, host="0.0.0.0", port=8000, reload=True)
+
+
+#+end_src
+
+** Bot Services
+
+#+begin_src python :tangle src/enhanced_discord_bot_llms/llm_svc.py :mkdirp yes :cache no
+
+#!/usr/bin/env python3
+import os
+
+import instructor
+
+from instructor import Instructor, AsyncInstructor
+from anthropic import Anthropic, AsyncAnthropic
+from groq import Groq, AsyncGroq
+from openai import OpenAI, AsyncOpenAI
+from pydantic import BaseModel, Field
+
+from enum import Enum, auto
+
+
+class LLMModel(str, Enum):
+    Claude3 = "claude-3-opus-20240229"
+    GPT4_Omni = "gpt-4o"
+    LLAMA3 = "llama3-70b-8192"
+
+
+def gen_client(model=LLMModel.GPT4_Omni) -> Instructor:
+    match model:
+        case LLMModel.Claude3:
+            client = instructor.from_anthropic(Anthropic())
+        case LLMModel.GPT4_Omni:
+            client = instructor.patch(OpenAI())
+        case LLMModel.LLAMA3:
+            client = instructor.patch(Groq())
+    return client
+
+
+def gen_async_client(model=LLMModel.GPT4_Omni) -> AsyncInstructor:
+    match model:
+        case LLMModel.Claude3:
+            client = instructor.from_anthropic(AsyncAnthropic())
+        case LLMModel.GPT4_Omni:
+            client = instructor.patch(AsyncOpenAI())
+        case LLMModel.LLAMA3:
+            client = instructor.patch(AsyncGroq())
+    return client
+
+
+## Gaou Domain
+
+
+class UserInfo(BaseModel):
+    name: str
+    age: int
+    is_teenager: bool
+    is_intelligent: bool
+
+
+def usine_de_gaou_creation(
+    ai_client: Instructor, parametre: str, model=LLMModel.GPT4_Omni
+) -> UserInfo:
+    gaou = ai_client.chat.completions.create(
+        model=model,
+        response_model=UserInfo,
+        messages=[{"role": "user", "content": parametre}],
+    )
+    return gaou
+
+
+async def streaming_usine_de_gaou_creation(
+    ai_client: AsyncInstructor, parametre: str, model=LLMModel.GPT4_Omni
+) -> UserInfo:
+    gaou = await ai_client.chat.completions.create(
+        model=model,
+        response_model=UserInfo,
+        messages=[
+            {
+                "role": "system",
+                "content": "The user may provide a prompt in their language of choice (such as english, french, creol, spanish etc.), so take that fact into account.",
+            },
+            {"role": "user", "content": parametre},
+        ],
+    )
+    return gaou
+
+
+class Language(str, Enum):
+    nouchi = "Nouchi"
+    moore = "Mooré"
+    lingala = "Lingala"
+    english = "English"
+    french = "French"
+    creole = "Créole"
+    spanish = "Spanish"
+
+
+class GaouJoke(BaseModel):
+    friend_gaou_joke: str = Field(
+        ...,
+        description="The joke that qualifies the friend as a Gaou. The joke should be light and humorous as well as alternate between Nouchi, Mooré, Lingala, English, French, Créole and Spanish.",
+    )
+    language: Language
+
+
+async def streaming_gaou_formula(
+    ai_client: AsyncInstructor, gaou_name: str, model=LLMModel.GPT4_Omni
+) -> GaouJoke:
+    gaou = await ai_client.chat.completions.create(
+        model=model,
+        temperature=1,  # Go wild with the temperature!!!!
+        max_tokens=1024,
+        response_model=GaouJoke,
+        messages=[
+            {
+                "role": "system",
+                "content": f"""
+                The term 'Gaou' is a funny term, used only amongs friends. For example, {gaou_name} is so Gaou!.
+                You will assist in qualifying a friend as a Gaou, based on the following criteria:
+                - The friend's name
+                - Make up a light joke which always ends up qualifying the friend as a Gaou
+                - Mix in some humor and sarcasm
+                - In a way Gaou means someone who is naive, gullible, or easily fooled but in a friendly way
+                - Use different languages out of one of the following: Mooré, English, French, Créole, Spanish etc.
+                """,
+            },
+            {"role": "user", "content": gaou_name},
+        ],
+    )
+    return gaou
+
+#+end_src
+
+** Bot implementation
+
+
+#+begin_src python :tangle src/enhanced_discord_bot_llms/gaoubot.py :mkdirp yes :cache no
+
+#!/usr/bin/env python3
+
+import os
+import random
+
+import discord
+
+from asyncio import sleep
+
+from discord.ext import commands, tasks
+
+from enhanced_discord_bot_llms.constants import (
+    WORDS_THE_BOT_DONT_LIKE,
+    FROWNING_FACE_EMOJI,
+)
+from enhanced_discord_bot_llms.llm_svc import (
+    gen_client,
+    usine_de_gaou_creation,
+    gen_async_client,
+    streaming_usine_de_gaou_creation,
+    LLMModel,
+    streaming_gaou_formula,
+)
+
+intents = discord.Intents.default()
+intents.typing = False
+intents.messages = True
+intents.message_content = True
+intents.reactions = True
+intents.members = True
+
+bot = commands.Bot(command_prefix="?", intents=intents)
+
+
+@bot.event
+async def on_message(message):
+    # we do not want the bot to reply to itself
+    if message.author == bot.user:
+        return
+
+    try:
+        content = message.content.lower()
+        for word in WORDS_THE_BOT_DONT_LIKE:
+            if word in content:
+                await sleep(10)
+                await message.channel.send(
+                    f"{message.author.mention} Hey! Do not use that word again {FROWNING_FACE_EMOJI}"
+                )
+                await message.channel.send(
+                    f"{message.author.mention} You called me: {word} and I don't like it. I've deleted your message."
+                )
+                await sleep(10)
+                await message.delete()
+    except Exception as e:
+        print(f"Error: {e}")
+
+    if message.content == "pingGG":
+        await message.channel.send("pongGG")
+        return
+
+    await bot.process_commands(message)
+
+
+@bot.event
+async def on_message_edit(before, after):
+    if before.author == bot.user:
+        return
+
+    if after.content == "ping":
+        await after.channel.send("pong")
+        return
+
+    await bot.process_commands(after)
+
+
+@bot.command()
+@commands.guild_only()
+async def ping(ctx: commands.Context):
+    """
+    ctx: Context (discord.ext.commands.Context, information about the command)
+
+    ?ping
+    """
+    await ctx.reply("pong")
+
+
+@bot.command()
+@commands.guild_only()
+async def new_gaou(ctx: commands.Context, parametre: str):
+    """
+    ctx: Context (discord.ext.commands.Context, information about the command)
+    parametre: str (message to send to the model)
+
+    ?new_gaou "I am not a Gaou named Lambert who is 15 years old and is intelligent."
+    """
+    model = LLMModel.GPT4_Omni
+    # model = LLMModel.LLAMA3
+    try:
+        client = gen_async_client(model=model)
+        gueou = await streaming_usine_de_gaou_creation(client, parametre, model=model)
+        await ctx.reply(f"""
+```json
+
+{gueou.model_dump_json(
+    indent=4
+)}
+```
+""")
+    except Exception as e:
+        print(f"Error: {e}")
+        await ctx.reply(f"An error occurred: {e}")
+
+
+@bot.command()
+@commands.has_permissions(administrator=True)
+@commands.bot_has_permissions(manage_messages=True)
+async def cleanup(ctx: commands.Context, limit: int):
+    """
+    ctx: Context (discord.ext.commands.Context, information about the command)
+    limit: int (number of messages to delete)
+
+    ?cleanup 10
+    """
+    await delete_messages(ctx, limit)
+
+
+@bot.command()
+@commands.dm_only()
+async def dm_cleanup(ctx: commands.Context, limit: int):
+    """
+    ctx: Context (discord.ext.commands.Context, information about the command)
+    limit: int (number of messages to delete)
+
+    ?dm_cleanup 10
+    """
+    await delete_messages(ctx, limit)
+
+
+async def delete_messages(ctx: commands.Context, limit: int):
+    print(f"Cleaning up: {limit} messages...")
+    async for msg in ctx.channel.history(limit=limit):
+        try:
+            print(f"Deleting message: {msg.content}")
+            await sleep(1)
+            await msg.delete()
+        except Exception as e:
+            print(f"Error: {e}")
+            await ctx.reply(f"You may not have permission to delete messages.")
+            continue
+
+
+@tasks.loop(minutes=16)
+async def my_background_gaou_tasks():
+    await bot.change_presence(activity=discord.Game(name="With Gaous"))
+    # members = [[member for member in guild.members] for guild in bot.guilds]
+    # members = bot.get_all_members()
+    channels = bot.get_all_channels()
+    for chnl in channels:
+        if isinstance(chnl, discord.TextChannel) and chnl.name == "botexperiments":
+            await chnl.send(
+                f"Who's Gaou anyway? Me Gaou? Think again... {chnl.mention}"
+            )
+            chnl_members = chnl.members
+            for chnl_m in chnl_members:
+                if chnl_m.bot:
+                    continue
+                elif (
+                    "african" in chnl_m.name.lower()
+                    or "dog" in chnl_m.name.lower()
+                    or "lle" in chnl_m.name.lower()
+                    or "bru" in chnl_m.name.lower()
+                ):
+                    await sleep(8)
+                    # model = random.choice(
+                    #     [model.value for model in LLMModel]
+                    # )  # Choose a model at random
+                    model = LLMModel.Claude3
+                    client = gen_async_client(model=model)
+                    gueou_joke = await streaming_gaou_formula(
+                        client, chnl_m.display_name, model=model
+                    )
+                    # message_to_gueou = f"{gueou_joke.friend_gaou_joke} ({gueou_joke.language.name} => {gueou_joke.language.value}) {chnl_m.mention}"
+                    message_to_gueou = f"{gueou_joke.friend_gaou_joke} ({gueou_joke.language.value}) {chnl_m.mention}"
+                    await chnl.send(message_to_gueou)
+
+
+@my_background_gaou_tasks.before_loop
+async def before_gueou():
+    await bot.wait_until_ready()
+    print("Ready for Gaous!")
+
+
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user} (ID: {bot.user.id})")
+    my_background_gaou_tasks.start()
+
+
+if __name__ == "__main__":
+    token = os.environ["DISCORD_BOT_TOKEN"]
+    bot.run(token)
+
+
+#+end_src
+
+* Deployment
+
+** Docker Containers
+
+*** Dockerize Discord API
+
+#+begin_src dockerfile :tangle docker/Dockerfile.api :mkdirp yes :cache no
+
+FROM python:3.12.3-alpine3.19
+
+COPY . .
+
+RUN apk add --no-cache libffi-dev openssl-dev gcc musl-dev make
+
+RUN pip install -r requirements.lock
+
+WORKDIR /src/enhanced_discord_bot_llms
+
+CMD ["python", "gaouapp.py"]
+
+
+#+end_src
+
+*** Dockerize Discord Bot
+
+#+begin_src dockerfile :tangle docker/Dockerfile.bot :mkdirp yes :cache no
+
+FROM python:3.12.3-alpine3.19
+
+COPY . .
+
+RUN apk add --no-cache libffi-dev openssl-dev gcc musl-dev make
+
+RUN pip install -r requirements.lock
+
+WORKDIR /src/enhanced_discord_bot_llms
+
+CMD ["python", "gaoubot.py"]
+
+#+end_src
+
+*** Helper Script
+
+
+#+begin_src bash :tangle cmd.sh :tangle-mode o755 :cache no
+
+#!/usr/bin/env bash
+set -x #echo on
+
+BASEDIR=$(dirname "$0")
+DOCKERDIR=$BASEDIR/docker
+PLATFORM=linux/amd64
+REGISTRY=ttl.sh
+
+echo "BASEDIR: $BASEDIR"
+echo "DOCKERDIR: $DOCKERDIR"
+
+case "$1" in
+  "dockerize:api")
+    echo "Building Docker image for API..."
+    docker buildx build --platform $PLATFORM -t $2 -f $DOCKERDIR/Dockerfile.api $BASEDIR
+    ;;
+  "dockerize:bot")
+    echo "Building Docker image for Bot..."
+    docker buildx build --platform $PLATFORM -t $2 -f $DOCKERDIR/Dockerfile.bot $BASEDIR
+    ;;
+  "docker:publish")
+    echo "Publishing Docker image..."
+    docker push $2
+    ;;
+  *)
+    echo "Usage: $0 {dockerize:api|dockerize:bot|docker:publish}"
+    exit 1
+    ;;
+esac
+
+exit 0
+
+#+end_src
+
+** Infrastructure
+
+#+begin_src mermaid
+
+graph TB
+
+DockerEngine(Docker Engine)
+
+DockerEngine -- Runs --> DockerContainer
+DockerEngine -- Builds --> DockerImage
+
+DockerFile(Dockerfile: Recipe for Images) -- Defines --> DockerImage
+
+DockerHub(Docker Hub: Public Repository) -- Stores and Shares --> DockerImage
+
+DockerContainer(Docker Container: Tiny, stand-alone, executable package)
+DockerImage(Docker Image: Blueprints for Containers) -- Creates --> DockerContainer
+
+subgraph "Analogy: Construction"
+  DockerFile -- "Architect's Plan" --> DockerImage
+  DockerImage -- "Pre-fab house parts" --> DockerContainer
+end
+
+#+end_src
+
+**** Install Docker on Ubuntu
+
+#+begin_src bash
+
+# Update your existing list of packages
+sudo apt update
+
+# Install a few prerequisite packages which let `apt` use packages over HTTPS
+sudo apt install apt-transport-https ca-certificates curl software-properties-common
+
+# Add the GPG key for the official Docker repository to your system
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+# Add the Docker repository to APT sources
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Update your existing list of packages again for the addition to be recognized
+sudo apt update
+
+# Make sure you are about to install from the Docker repo instead of the default Ubuntu repo
+apt-cache policy docker-ce
+
+# Install Docker
+sudo apt install docker-ce
+
+# Check that it’s running
+sudo systemctl status docker
+
+#+end_src
+
+**** Configure Docker
+
+Docker without `sudo`
+
+#+begin_src bash
+
+# Add your username to the docker group
+sudo usermod -aG docker ${USER}
+
+#+end_src
+
+Apply the new group membership, log out of the server and back in (Optional?)
+
+#+begin_src bash
+
+su - ${USER}
+
+groups
+
+#+end_src
+
+**** Environment Variables Management
+
+We will use [[https://direnv.net/][direnv]] and [[https://direnv.net/docs/hook.html][configure]] it for bash inside our virtual machine.
+
+#+begin_src bash
+
+sudo apt install direnv
+
+eval "$(direnv hook bash)"
+
+#+end_src
